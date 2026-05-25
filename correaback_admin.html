@@ -321,14 +321,14 @@
         <input type="file" id="fileComissao" accept=".xlsx,.xls,.csv" />
         <div class="drop-icon">💰</div>
         <div class="drop-label">Relatório de Comissão</div>
-        <div class="drop-hint">Credor · coluna "loja" (CPF) + comissão + valor pago</div>
+        <div class="drop-hint">Credor · coluna "nr_titulo" (contrato) + comissão + valor pago</div>
         <div class="drop-status" id="statusComissao">—</div>
       </div>
       <div class="drop-zone" id="dzCrm">
         <input type="file" id="fileCrm" accept=".xlsx,.xls,.csv" />
         <div class="drop-icon">🗄</div>
         <div class="drop-label">CRM — Operadores</div>
-        <div class="drop-hint">Coluna CPF (0002550677) + Operador</div>
+        <div class="drop-hint">Coluna "contrato" + Operador</div>
         <div class="drop-status" id="statusCrm">—</div>
       </div>
     </div>
@@ -463,14 +463,20 @@ function normNome(v) {
   return String(v).toUpperCase().trim();
 }
 
+// Normaliza contrato: remove zeros à esquerda, espaços, traços, pontos
+// para garantir match mesmo com formatações diferentes
+function normContrato(v) {
+  return String(v).trim().replace(/[\s\-\.]/g, '').replace(/^0+/, '') || String(v).trim();
+}
+
 // ─── CARREGAR RELATÓRIO DE COMISSÃO ────────────────────────────────────────
 setupDrop('dzComissao', 'fileComissao', file => {
   readXLSX(file, rows => {
     // Detecta colunas dinamicamente
     const keys = Object.keys(rows[0] || {});
 
-    // Coluna CPF → "loja" ou variação
-    const colCpf = keys.find(k => /loja|cpf|doc/i.test(k)) || keys[0];
+    // Coluna contrato no relatório → "nr_titulo" ou variações
+    const colContrato = keys.find(k => /nr.?titulo|num.?titulo|titulo|nr.?contrato|contrato|num.?contrato/i.test(k)) || keys[0];
 
     // Coluna valor pago → "valor_pago", "vl_pago", "pagamento", etc.
     const colPago = keys.find(k => /pago|pagamento|vl.?pag|valor.?pag/i.test(k));
@@ -478,10 +484,13 @@ setupDrop('dzComissao', 'fileComissao', file => {
     // Coluna comissão → "comissao", "comissão", "vl_com", "valor_com"
     const colCom = keys.find(k => /comiss|commission|vl.?com|valor.?com/i.test(k));
 
+    console.log('[Comissão] colunas:', keys);
+    console.log('[Comissão] contrato:', colContrato, '| pago:', colPago, '| comissão:', colCom);
+
     dadosComissao = rows
-      .filter(r => r[colCpf])
+      .filter(r => r[colContrato])
       .map(r => ({
-        cpf: normCpf(r[colCpf]),
+        contrato: normContrato(r[colContrato]),
         valorPago: parseFloat(String(r[colPago]||'0').replace(',','.')) || 0,
         comissao:  parseFloat(String(r[colCom] ||'0').replace(',','.')) || 0,
       }));
@@ -500,17 +509,23 @@ setupDrop('dzCrm', 'fileCrm', file => {
   readXLSX(file, rows => {
     const keys = Object.keys(rows[0] || {});
 
-    // Coluna CPF → "0002550677" ou cpf, doc, etc.
-    const colCpf = keys.find(k => /0002550677|cpf|doc|devedor/i.test(k)) || keys[0];
+    // Coluna contrato no CRM → "contrato" ou variações
+    const colContrato = keys.find(k => /^contrato$/i.test(k))
+                     || keys.find(k => /contrato|nr.?contrato|num.?contrato|nr.?titulo|titulo/i.test(k))
+                     || keys[0];
 
-    // Coluna operador
-    const colOp = keys.find(k => /operador|operator|usuario|atendente/i.test(k));
+    // Coluna operador → "Operador" exato primeiro, depois variações
+    const colOp = keys.find(k => /^operador$/i.test(k))
+               || keys.find(k => /operador|operator|usuario|atendente|consultor/i.test(k));
+
+    console.log('[CRM] colunas:', keys);
+    console.log('[CRM] contrato:', colContrato, '| operador:', colOp);
 
     dadosCrm = {};
     rows.forEach(r => {
-      const cpf = normCpf(r[colCpf]);
-      const op  = normNome(r[colOp] || '');
-      if(cpf && op) dadosCrm[cpf] = op;
+      const contrato = normContrato(r[colContrato]);
+      const op       = normNome(r[colOp] || '');
+      if(contrato && op) dadosCrm[contrato] = op;
     });
 
     const dz = document.getElementById('dzCrm');
@@ -538,7 +553,7 @@ function tryRender() {
   const porOperador = {}; // nome -> {pago, comissao, acordos}
 
   dadosComissao.forEach(row => {
-    const op = dadosCrm[row.cpf];
+    const op = dadosCrm[row.contrato];
     if(!op) return;
     cruzados++;
     if(!porOperador[op]) porOperador[op] = { pago:0, comissao:0, acordos:0 };
@@ -546,6 +561,18 @@ function tryRender() {
     porOperador[op].comissao += row.comissao;
     porOperador[op].acordos++;
   });
+
+  // Fallback: se nenhum CPF cruzou mas só existe 1 operadora configurada,
+  // atribui TODO o relatório a ela (carteira exclusiva de 1 operadora)
+  const nomeOps = Object.keys(OPERADORES_META);
+  if(cruzados === 0 && nomeOps.length === 1) {
+    const nomeUnico = nomeOps[0];
+    const totalPagoFB   = dadosComissao.reduce((s,r) => s+r.valorPago, 0);
+    const totalComFB    = dadosComissao.reduce((s,r) => s+r.comissao, 0);
+    porOperador[nomeUnico] = { pago: totalPagoFB, comissao: totalComFB, acordos: dadosComissao.length };
+    cruzados = dadosComissao.length;
+    console.warn('[Correaback] Cruzamento zerado — atribuindo carteira completa a:', nomeUnico);
+  }
 
   // Calcula período (dias decorridos e estimados) a partir do primeiro/último do mês atual
   const hoje = new Date();
@@ -605,8 +632,8 @@ function tryRender() {
   // Status bar
   document.getElementById('statusBar').classList.add('visible');
   document.getElementById('statusBar').innerHTML =
-    `<b>${cruzados}</b> de <b>${dadosComissao.length}</b> acordos cruzados com operadores · ` +
-    `<b>${Object.keys(dadosCrm).length - cruzados < 0 ? 0 : dadosComissao.length - cruzados}</b> sem vínculo no CRM`;
+    `<b>${cruzados}</b> de <b>${dadosComissao.length}</b> contratos cruzados com operadores · ` +
+    `<b>${dadosComissao.length - cruzados}</b> sem vínculo no CRM`;
 
   // Salva no localStorage para a página de operação ler
   try {
