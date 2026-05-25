@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nexus — Correaback · Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1526;
+      --surface: #111e35;
+      --surface2: #172240;
+      --border: #1e304f;
+      --accent: #00d4a0;
+      --accent2: #00b48a;
+      --green: #00d4a0;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --text: #e8eaf0;
+      --muted: #5a7a9a;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Inter', sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+    }
+
+    /* HEADER */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 32px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .logo {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .logo span { color: var(--accent); }
+    .badge-live {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 600; letter-spacing: .1em;
+      color: var(--green); text-transform: uppercase;
+    }
+    .badge-live::before {
+      content: '';
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green);
+      animation: pulse 1.6s infinite;
+    }
+    @keyframes pulse {
+      0%,100%{opacity:1;transform:scale(1)}
+      50%{opacity:.4;transform:scale(1.3)}
+    }
+
+    /* HERO */
+    .hero {
+      padding: 40px 32px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-tag {
+      font-size: 11px; font-weight: 600; letter-spacing: .15em;
+      text-transform: uppercase; color: var(--accent); margin-bottom: 8px;
+    }
+    .hero h1 {
+      font-size: 28px; font-weight: 800; line-height: 1.1;
+      color: var(--text); margin-bottom: 4px;
+    }
+    .hero-sub {
+      font-size: 13px; color: var(--muted);
+      font-family: var(--mono);
+    }
+    .admin-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 20px; padding: 4px 14px;
+      font-size: 11px; font-weight: 600; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--muted); margin-top: 12px;
+    }
+
+    /* LAYOUT */
+    .main { display: flex; flex-direction: column; gap: 0; }
+
+    /* IMPORT SECTION */
+    .import-section {
+      padding: 32px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .import-section h2 {
+      font-size: 12px; font-weight: 700; letter-spacing: .15em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 20px;
+    }
+    .import-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+      max-width: 760px;
+    }
+    .drop-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: 10px;
+      padding: 24px 20px;
+      cursor: pointer;
+      transition: all .2s;
+      background: var(--bg);
+      position: relative;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(79,142,247,.05);
+    }
+    .drop-zone.loaded {
+      border-color: var(--green);
+      border-style: solid;
+      background: rgba(34,197,94,.04);
+    }
+    .drop-icon { font-size: 22px; margin-bottom: 8px; }
+    .drop-label {
+      font-size: 12px; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--text); margin-bottom: 4px;
+    }
+    .drop-hint {
+      font-size: 11px; color: var(--muted); font-family: var(--mono);
+    }
+    .drop-status {
+      margin-top: 10px;
+      font-size: 11px; font-family: var(--mono);
+      color: var(--green); display: none;
+    }
+    .drop-zone.loaded .drop-status { display: block; }
+    .drop-zone input[type=file] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+
+    /* STATUS BAR */
+    .status-bar {
+      padding: 14px 32px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px; font-family: var(--mono); color: var(--muted);
+      display: none;
+    }
+    .status-bar.visible { display: block; }
+    .status-bar b { color: var(--text); }
+
+    /* STATS */
+    .stats-row {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      border-bottom: 1px solid var(--border);
+    }
+    .stat-card {
+      padding: 24px 28px;
+      border-right: 1px solid var(--border);
+    }
+    .stat-card:last-child { border-right: none; }
+    .stat-label {
+      font-size: 10px; font-weight: 700; letter-spacing: .15em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 8px;
+    }
+    .stat-value {
+      font-size: 22px; font-weight: 800;
+      font-family: var(--mono); color: var(--text);
+      letter-spacing: -.02em;
+    }
+    .stat-sub {
+      font-size: 11px; color: var(--muted);
+      font-family: var(--mono); margin-top: 3px;
+    }
+    .stat-value.green { color: var(--green); }
+    .stat-value.yellow { color: var(--yellow); }
+    .stat-value.red { color: var(--red); }
+
+    /* PERIOD BAR */
+    .period-bar {
+      padding: 14px 32px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px; font-family: var(--mono); color: var(--muted);
+      display: none;
+    }
+    .period-bar.visible { display: flex; align-items: center; gap: 24px; }
+    .period-bar b { color: var(--text); }
+    .progress-mini {
+      flex: 1; max-width: 200px;
+      height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;
+    }
+    .progress-mini-fill {
+      height: 100%; background: var(--accent); border-radius: 2px;
+      transition: width .6s ease;
+    }
+
+    /* SORT BAR */
+    .sort-bar {
+      padding: 14px 32px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+      display: none;
+    }
+    .sort-bar.visible { display: flex; }
+    .sort-label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+    .sort-btn {
+      padding: 5px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-size: 11px; font-weight: 600; letter-spacing: .06em;
+      text-transform: uppercase; cursor: pointer; transition: all .15s;
+      font-family: var(--sans);
+    }
+    .sort-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .sort-btn.active {
+      background: var(--accent); border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* TABLE */
+    .table-wrap {
+      padding: 0 32px 40px;
+      overflow-x: auto;
+      display: none;
+    }
+    .table-wrap.visible { display: block; }
+    table {
+      width: 100%; border-collapse: collapse; margin-top: 20px;
+    }
+    thead th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 10px; font-weight: 700; letter-spacing: .15em;
+      text-transform: uppercase; color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    thead th:not(:first-child):not(:nth-child(2)) { text-align: right; }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .15s;
+    }
+    tbody tr:hover { background: var(--surface2); }
+    tbody tr.rank-1 { background: rgba(79,142,247,.06); }
+    tbody td {
+      padding: 14px 14px;
+      font-size: 13px;
+    }
+    td.rank { font-family: var(--mono); font-size: 12px; color: var(--muted); width: 40px; }
+    td.name { font-weight: 700; font-size: 13px; }
+    td.num {
+      text-align: right; font-family: var(--mono); font-size: 12px;
+    }
+    td.meta-cell { text-align: right; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+    /* PROGRESS BAR */
+    .bar-wrap {
+      display: flex; align-items: center; gap: 10px; justify-content: flex-end;
+    }
+    .bar-track {
+      width: 80px; height: 5px;
+      background: var(--border); border-radius: 3px; overflow: hidden;
+      flex-shrink: 0;
+    }
+    .bar-fill {
+      height: 100%; border-radius: 3px;
+      transition: width .6s ease;
+    }
+    .bar-text { font-family: var(--mono); font-size: 12px; min-width: 42px; text-align: right; }
+
+    /* EMPTY STATE */
+    .empty {
+      padding: 60px 32px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 36px; margin-bottom: 12px; }
+    .empty-msg { font-size: 14px; }
+    .empty-hint { font-size: 12px; font-family: var(--mono); margin-top: 6px; }
+
+    /* MEDAL */
+    .medal { font-size: 14px; margin-right: 4px; }
+
+    /* FOOTER */
+    footer {
+      padding: 20px 32px;
+      border-top: 1px solid var(--border);
+      font-size: 11px; color: var(--muted); font-family: var(--mono);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><span>Nexus</span> / Assessoria de Cobrança</div>
+  <div class="badge-live">AO VIVO</div>
+</header>
+
+<div class="hero">
+  <div class="hero-tag">🏪 Correaback</div>
+  <h1>Ranking de Operadores</h1>
+  <div class="hero-sub">Admin · Importação de arquivos</div>
+  <div class="admin-pill">⚙ Admin</div>
+</div>
+
+<div class="main">
+
+  <!-- IMPORT -->
+  <div class="import-section">
+    <h2>📂 Carregar arquivos</h2>
+    <div class="import-grid">
+      <div class="drop-zone" id="dzComissao">
+        <input type="file" id="fileComissao" accept=".xlsx,.xls,.csv" />
+        <div class="drop-icon">💰</div>
+        <div class="drop-label">Relatório de Comissão</div>
+        <div class="drop-hint">Credor · coluna "loja" (CPF) + comissão + valor pago</div>
+        <div class="drop-status" id="statusComissao">—</div>
+      </div>
+      <div class="drop-zone" id="dzCrm">
+        <input type="file" id="fileCrm" accept=".xlsx,.xls,.csv" />
+        <div class="drop-icon">🗄</div>
+        <div class="drop-label">CRM — Operadores</div>
+        <div class="drop-hint">Coluna CPF (0002550677) + Operador</div>
+        <div class="drop-status" id="statusCrm">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="status-bar" id="statusBar">
+    Nenhum arquivo importado. Carregue o relatório de comissão e o CRM para gerar o ranking.
+  </div>
+
+  <!-- STATS ROW -->
+  <div class="stats-row" id="statsRow" style="display:none">
+    <div class="stat-card">
+      <div class="stat-label">Total Recuperado</div>
+      <div class="stat-value" id="statPago">R$ —</div>
+      <div class="stat-sub">toda a carteira</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Comissão</div>
+      <div class="stat-value" id="statComissao">R$ —</div>
+      <div class="stat-sub">toda a carteira</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Meta Total</div>
+      <div class="stat-value" id="statMeta">R$ 7.000,00</div>
+      <div class="stat-sub">1 operador</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">% Realizado</div>
+      <div class="stat-value" id="statPct">—</div>
+      <div class="stat-sub" id="statPctSub">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Acordos cruzados</div>
+      <div class="stat-value" id="statAcordos">—</div>
+      <div class="stat-sub" id="statAcordosSub">do relatório</div>
+    </div>
+  </div>
+
+  <!-- PERIOD BAR -->
+  <div class="period-bar" id="periodBar">
+    <span>Período de importação</span>
+    <b id="periodText">—</b>
+  </div>
+
+  <!-- SORT BAR -->
+  <div class="sort-bar" id="sortBar">
+    <span class="sort-label">Ordenar:</span>
+    <button class="sort-btn" data-sort="projecao" onclick="setSort('projecao')">% Projeção</button>
+    <button class="sort-btn" data-sort="pago" onclick="setSort('pago')">Valor Pago</button>
+    <button class="sort-btn" data-sort="realizado" onclick="setSort('realizado')">% Realizado</button>
+    <button class="sort-btn" data-sort="meta" onclick="setSort('meta')">Meta</button>
+    <button class="sort-btn" data-sort="nome" onclick="setSort('nome')">Nome</button>
+  </div>
+
+  <!-- EMPTY STATE -->
+  <div class="empty" id="emptyState">
+    <div class="empty-icon">📂</div>
+    <div class="empty-msg">Nenhum arquivo importado.</div>
+    <div class="empty-hint">Carregue o relatório de comissão e o CRM para gerar o ranking.</div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap" id="tableWrap">
+    <table id="rankTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Operador</th>
+          <th>Valor Pago</th>
+          <th>Valor Comissão</th>
+          <th>Meta</th>
+          <th>% Meta</th>
+          <th>% Projeção</th>
+        </tr>
+      </thead>
+      <tbody id="rankBody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<footer>
+  Nexus Assessoria de Cobrança · Correaback · dados importados localmente, sem envio a servidores
+</footer>
+
+<script>
+// ─── CONFIG FIXA ───────────────────────────────────────────────────────────
+const OPERADORES_META = {
+  'MARIA DAYANE ELLY GOMES DA SILVA': 7000,
+};
+
+// Dias do período (para projeção) — ajuste se necessário
+let DIAS_DECORRIDOS = 0;
+let DIAS_PERIODO = 0;
+
+// ─── STATE ─────────────────────────────────────────────────────────────────
+let dadosComissao = null; // [{cpf, valorPago, comissao}]
+let dadosCrm = null;      // {cpf -> operador}
+let sortKey = 'projecao';
+
+// ─── FILE HANDLERS ─────────────────────────────────────────────────────────
+function setupDrop(dzId, inputId, onLoad) {
+  const dz = document.getElementById(dzId);
+  const inp = document.getElementById(inputId);
+  inp.addEventListener('change', e => { if(e.target.files[0]) onLoad(e.target.files[0]); });
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag-over');
+    if(e.dataTransfer.files[0]) onLoad(e.dataTransfer.files[0]);
+  });
+}
+
+function readXLSX(file, cb) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(e.target.result, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    cb(rows);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// Normaliza CPF: remove pontos, traços, espaços, mantém só dígitos
+function normCpf(v) {
+  return String(v).replace(/\D/g, '').padStart(11, '0');
+}
+
+function normNome(v) {
+  return String(v).toUpperCase().trim();
+}
+
+// ─── CARREGAR RELATÓRIO DE COMISSÃO ────────────────────────────────────────
+setupDrop('dzComissao', 'fileComissao', file => {
+  readXLSX(file, rows => {
+    // Detecta colunas dinamicamente
+    const keys = Object.keys(rows[0] || {});
+
+    // Coluna CPF → "loja" ou variação
+    const colCpf = keys.find(k => /loja|cpf|doc/i.test(k)) || keys[0];
+
+    // Coluna valor pago → "valor_pago", "vl_pago", "pagamento", etc.
+    const colPago = keys.find(k => /pago|pagamento|vl.?pag|valor.?pag/i.test(k));
+
+    // Coluna comissão → "comissao", "comissão", "vl_com", "valor_com"
+    const colCom = keys.find(k => /comiss|commission|vl.?com|valor.?com/i.test(k));
+
+    dadosComissao = rows
+      .filter(r => r[colCpf])
+      .map(r => ({
+        cpf: normCpf(r[colCpf]),
+        valorPago: parseFloat(String(r[colPago]||'0').replace(',','.')) || 0,
+        comissao:  parseFloat(String(r[colCom] ||'0').replace(',','.')) || 0,
+      }));
+
+    const dz = document.getElementById('dzComissao');
+    dz.classList.add('loaded');
+    document.getElementById('statusComissao').textContent =
+      `✓ ${file.name} · ${dadosComissao.length} registros`;
+
+    tryRender();
+  });
+});
+
+// ─── CARREGAR CRM ──────────────────────────────────────────────────────────
+setupDrop('dzCrm', 'fileCrm', file => {
+  readXLSX(file, rows => {
+    const keys = Object.keys(rows[0] || {});
+
+    // Coluna CPF → "0002550677" ou cpf, doc, etc.
+    const colCpf = keys.find(k => /0002550677|cpf|doc|devedor/i.test(k)) || keys[0];
+
+    // Coluna operador
+    const colOp = keys.find(k => /operador|operator|usuario|atendente/i.test(k));
+
+    dadosCrm = {};
+    rows.forEach(r => {
+      const cpf = normCpf(r[colCpf]);
+      const op  = normNome(r[colOp] || '');
+      if(cpf && op) dadosCrm[cpf] = op;
+    });
+
+    const dz = document.getElementById('dzCrm');
+    dz.classList.add('loaded');
+    document.getElementById('statusCrm').textContent =
+      `✓ ${file.name} · ${Object.keys(dadosCrm).length} vínculos`;
+
+    tryRender();
+  });
+});
+
+// ─── PROCESSAR + RENDERIZAR ────────────────────────────────────────────────
+function tryRender() {
+  if(!dadosComissao || !dadosCrm) {
+    document.getElementById('statusBar').classList.add('visible');
+    document.getElementById('statusBar').textContent =
+      !dadosComissao
+        ? 'Aguardando relatório de comissão...'
+        : 'Aguardando CRM de operadores...';
+    return;
+  }
+
+  // Cruzamento CPF → operador
+  let cruzados = 0;
+  const porOperador = {}; // nome -> {pago, comissao, acordos}
+
+  dadosComissao.forEach(row => {
+    const op = dadosCrm[row.cpf];
+    if(!op) return;
+    cruzados++;
+    if(!porOperador[op]) porOperador[op] = { pago:0, comissao:0, acordos:0 };
+    porOperador[op].pago     += row.valorPago;
+    porOperador[op].comissao += row.comissao;
+    porOperador[op].acordos++;
+  });
+
+  // Calcula período (dias decorridos e estimados) a partir do primeiro/último do mês atual
+  const hoje = new Date();
+  const inicioPeriodo = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const fimPeriodo    = new Date(hoje.getFullYear(), hoje.getMonth()+1, 0);
+  DIAS_DECORRIDOS = hoje.getDate();
+  DIAS_PERIODO    = fimPeriodo.getDate();
+
+  // Monta array de operadores
+  const ops = Object.entries(porOperador).map(([nome, d]) => {
+    const meta      = OPERADORES_META[nome] || null;
+    const pctMeta   = meta ? (d.comissao / meta * 100) : null;
+    const projecao  = DIAS_DECORRIDOS > 0
+      ? (d.comissao / DIAS_DECORRIDOS) * DIAS_PERIODO
+      : 0;
+    const pctProj   = meta ? (projecao / meta * 100) : null;
+    return { nome, ...d, meta, pctMeta, projecao, pctProj };
+  });
+
+  // Totais
+  const totalPago     = dadosComissao.reduce((s,r) => s+r.valorPago, 0);
+  const totalComissao = dadosComissao.reduce((s,r) => s+r.comissao, 0);
+  const metaTotal     = Object.values(OPERADORES_META).reduce((s,v)=>s+v,0);
+  const comOps        = ops.filter(o=>o.meta);
+  const pctRealizado  = comOps.length
+    ? comOps.reduce((s,o)=>s+o.comissao,0) / metaTotal * 100
+    : null;
+  const pctProjecao   = comOps.length
+    ? comOps.reduce((s,o)=>s+o.projecao,0) / metaTotal * 100
+    : null;
+
+  // Stats
+  document.getElementById('statsRow').style.display = 'grid';
+  document.getElementById('statPago').textContent      = fmtBRL(totalPago);
+  document.getElementById('statComissao').textContent  = fmtBRL(totalComissao);
+  document.getElementById('statMeta').textContent      = fmtBRL(metaTotal);
+
+  const pctEl = document.getElementById('statPct');
+  if(pctRealizado !== null) {
+    pctEl.textContent = fmtPct(pctRealizado);
+    pctEl.className = 'stat-value ' + colorClass(pctRealizado);
+    document.getElementById('statPctSub').textContent =
+      pctProjecao ? `projeção ${fmtPct(pctProjecao)}` : '';
+  }
+
+  document.getElementById('statAcordos').textContent = cruzados.toLocaleString('pt-BR');
+  document.getElementById('statAcordosSub').textContent =
+    `de ${dadosComissao.length} no relatório`;
+
+  // Period bar
+  const pb = document.getElementById('periodBar');
+  pb.classList.add('visible');
+  const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  document.getElementById('periodText').textContent =
+    `${DIAS_DECORRIDOS} dias decorridos de ${DIAS_PERIODO} · ${meses[hoje.getMonth()]}/${hoje.getFullYear()}`;
+
+  // Status bar
+  document.getElementById('statusBar').classList.add('visible');
+  document.getElementById('statusBar').innerHTML =
+    `<b>${cruzados}</b> de <b>${dadosComissao.length}</b> acordos cruzados com operadores · ` +
+    `<b>${Object.keys(dadosCrm).length - cruzados < 0 ? 0 : dadosComissao.length - cruzados}</b> sem vínculo no CRM`;
+
+  // Salva no localStorage para a página de operação ler
+  try {
+    localStorage.setItem('correaback_data', JSON.stringify({
+      totalPago,
+      totalComissao,
+      cruzados,
+      operadores: ops.map(o => ({
+        nome:      o.nome,
+        pago:      o.pago,
+        comissao:  o.comissao,
+        acordos:   o.acordos,
+        meta:      o.meta,
+      })),
+      savedAt: new Date().toISOString(),
+    }));
+  } catch(e) {}
+
+  // Render table
+  renderTable(ops);
+}
+
+// ─── TABELA ────────────────────────────────────────────────────────────────
+function setSort(k) {
+  sortKey = k;
+  document.querySelectorAll('.sort-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.sort === k);
+  });
+  if(dadosComissao && dadosCrm) tryRender();
+}
+
+function renderTable(ops) {
+  // Sort
+  ops.sort((a,b) => {
+    if(sortKey === 'projecao') return (b.pctProj||0) - (a.pctProj||0);
+    if(sortKey === 'pago')     return b.pago - a.pago;
+    if(sortKey === 'realizado') return (b.pctMeta||0) - (a.pctMeta||0);
+    if(sortKey === 'meta')     return (b.meta||0) - (a.meta||0);
+    if(sortKey === 'nome')     return a.nome.localeCompare(b.nome);
+    return 0;
+  });
+
+  const medals = ['🥇','🥈','🥉'];
+  const tbody = document.getElementById('rankBody');
+  tbody.innerHTML = '';
+
+  ops.forEach((op, i) => {
+    const pct  = op.pctMeta ?? 0;
+    const proj = op.pctProj ?? 0;
+    const clr  = colorClass(pct);
+    const clrP = colorClass(proj);
+
+    const tr = document.createElement('tr');
+    if(i === 0) tr.classList.add('rank-1');
+
+    tr.innerHTML = `
+      <td class="rank">${medals[i] ? `<span class="medal">${medals[i]}</span>` : i+1}</td>
+      <td class="name">${op.nome}</td>
+      <td class="num">${fmtBRL(op.pago)}</td>
+      <td class="num">${fmtBRL(op.comissao)}</td>
+      <td class="meta-cell">${op.meta ? fmtBRL(op.meta) : '—'}</td>
+      <td class="num">
+        <div class="bar-wrap">
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${Math.min(pct,100)}%;background:var(--${clr==='green'?'green':clr==='yellow'?'yellow':'red'})"></div>
+          </div>
+          <span class="bar-text" style="color:var(--${clr==='green'?'green':clr==='yellow'?'yellow':'red'})">${op.meta ? fmtPct(pct) : '—'}</span>
+        </div>
+      </td>
+      <td class="num">
+        <div class="bar-wrap">
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${Math.min(proj,100)}%;background:var(--accent)"></div>
+          </div>
+          <span class="bar-text" style="color:var(--accent)">${op.meta ? fmtPct(proj) : '—'}</span>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('sortBar').classList.add('visible');
+  document.getElementById('tableWrap').classList.add('visible');
+  setSort(sortKey); // highlight active btn
+}
+
+// ─── UTILS ─────────────────────────────────────────────────────────────────
+function fmtBRL(v) {
+  return v.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+}
+function fmtPct(v) {
+  return v.toFixed(1).replace('.',',') + '%';
+}
+function colorClass(pct) {
+  if(pct >= 100) return 'green';
+  if(pct >= 70)  return 'yellow';
+  return 'red';
+}
+
+// Init sort button
+setSort('projecao');
+</script>
+</body>
+</html>
