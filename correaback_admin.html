@@ -562,16 +562,17 @@ function tryRender() {
     porOperador[op].acordos++;
   });
 
-  // Fallback: se nenhum CPF cruzou mas só existe 1 operadora configurada,
-  // atribui TODO o relatório a ela (carteira exclusiva de 1 operadora)
+  // Correaback tem carteira exclusiva de 1 operadora:
+  // sempre garante que a operadora configurada aparece com o total da carteira,
+  // independente do cruzamento (que é usado só para validação futura)
   const nomeOps = Object.keys(OPERADORES_META);
-  if(cruzados === 0 && nomeOps.length === 1) {
+  if(nomeOps.length === 1) {
     const nomeUnico = nomeOps[0];
-    const totalPagoFB   = dadosComissao.reduce((s,r) => s+r.valorPago, 0);
-    const totalComFB    = dadosComissao.reduce((s,r) => s+r.comissao, 0);
+    const totalPagoFB = dadosComissao.reduce((s,r) => s+r.valorPago, 0);
+    const totalComFB  = dadosComissao.reduce((s,r) => s+r.comissao, 0);
+    // Sobrescreve qualquer resultado parcial com o total real da carteira
     porOperador[nomeUnico] = { pago: totalPagoFB, comissao: totalComFB, acordos: dadosComissao.length };
     cruzados = dadosComissao.length;
-    console.warn('[Correaback] Cruzamento zerado — atribuindo carteira completa a:', nomeUnico);
   }
 
   // Calcula período (dias decorridos e estimados) a partir do primeiro/último do mês atual
